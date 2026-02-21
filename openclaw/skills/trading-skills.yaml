@@ -1,0 +1,210 @@
+# ═══════════════════════════════════════════════════════════════
+# OpenClaw Skills — Trading Bot Custom Tools
+# Skills extend agent capabilities with reusable tool definitions
+# ═══════════════════════════════════════════════════════════════
+
+skills:
+
+  # ─── Data Pipeline Skills ──────────────────────────────────
+
+  - name: "fetch_earnings_calendar"
+    description: "Fetch upcoming earnings calendar from SEC EDGAR / Yahoo Finance"
+    tool: "exec"
+    command: |
+      python3 ~/trading-bot/openclaw/scripts/fetch_calendar.py \
+        --date-start "{start_date}" \
+        --date-end "{end_date}" \
+        --output ~/trading-bot/openclaw/data/calendar.json
+    parameters:
+      - name: "start_date"
+        type: "string"
+        required: true
+        description: "Start date in YYYY-MM-DD format"
+      - name: "end_date"
+        type: "string"
+        required: true
+        description: "End date in YYYY-MM-DD format"
+    output_file: "~/trading-bot/openclaw/data/calendar.json"
+
+  - name: "scan_sec_events"
+    description: "Scan SEC EDGAR for Form 4, 8-K, S-3 filings for given tickers"
+    tool: "exec"
+    command: |
+      python3 ~/trading-bot/openclaw/scripts/fetch_sec_events.py \
+        --tickers "{tickers}" \
+        --days {lookback_days} \
+        --output ~/trading-bot/openclaw/data/sec_events.json
+    parameters:
+      - name: "tickers"
+        type: "string"
+        required: true
+        description: "Comma-separated ticker symbols"
+      - name: "lookback_days"
+        type: "integer"
+        required: false
+        default: 14
+        description: "Number of days to look back"
+    output_file: "~/trading-bot/openclaw/data/sec_events.json"
+
+  - name: "setup_ibkr_monitoring"
+    description: "Configure IBKR monitoring for up to 100 tickers"
+    tool: "exec"
+    command: |
+      python3 ~/trading-bot/openclaw/scripts/ibkr_monitor.py \
+        --mode setup \
+        --tickers "{tickers}" \
+        --output ~/trading-bot/openclaw/data/ibkr_config.json
+    parameters:
+      - name: "tickers"
+        type: "string"
+        required: true
+        description: "Comma-separated ticker symbols"
+    output_file: "~/trading-bot/openclaw/data/ibkr_config.json"
+
+  - name: "fetch_premarket_data"
+    description: "Fetch pre-market data (price, volume, ATR, sector) from IBKR"
+    tool: "exec"
+    command: |
+      python3 ~/trading-bot/openclaw/scripts/ibkr_monitor.py \
+        --mode premarket \
+        --config ~/trading-bot/openclaw/data/ibkr_config.json \
+        --output ~/trading-bot/openclaw/data/premarket_data.json
+    output_file: "~/trading-bot/openclaw/data/premarket_data.json"
+
+  - name: "calculate_scores"
+    description: "Calculate composite trading scores for all candidates"
+    tool: "exec"
+    command: |
+      python3 ~/trading-bot/openclaw/scripts/scoring_engine.py \
+        --premarket ~/trading-bot/openclaw/data/premarket_data.json \
+        --sec-events ~/trading-bot/openclaw/data/sec_events.json \
+        --calendar ~/trading-bot/openclaw/data/calendar.json \
+        --output ~/trading-bot/openclaw/data/scoring_result.json
+    output_file: "~/trading-bot/openclaw/data/scoring_result.json"
+
+  # ─── Trade Execution Skills ────────────────────────────────
+
+  - name: "execute_buy"
+    description: "Execute a BUY order via IBKR"
+    tool: "exec"
+    command: |
+      python3 ~/trading-bot/openclaw/scripts/execute_trade.py \
+        --mode buy \
+        --ticker "{ticker}" \
+        --entry-price {entry_price} \
+        --target-price {target_price} \
+        --stop-price {stop_price} \
+        --predicted-gain {predicted_gain}
+    parameters:
+      - name: "ticker"
+        type: "string"
+        required: true
+      - name: "entry_price"
+        type: "float"
+        required: true
+      - name: "target_price"
+        type: "float"
+        required: true
+      - name: "stop_price"
+        type: "float"
+        required: true
+      - name: "predicted_gain"
+        type: "float"
+        required: false
+        default: 9.0
+
+  - name: "execute_sell"
+    description: "Close a position via IBKR"
+    tool: "exec"
+    command: |
+      python3 ~/trading-bot/openclaw/scripts/execute_trade.py \
+        --mode sell \
+        --ticker "{ticker}" \
+        --reason "{reason}"
+    parameters:
+      - name: "ticker"
+        type: "string"
+        required: true
+      - name: "reason"
+        type: "string"
+        required: false
+        default: "manual"
+
+  - name: "get_positions_status"
+    description: "Get all open positions and their current status"
+    tool: "exec"
+    command: |
+      python3 ~/trading-bot/openclaw/scripts/execute_trade.py --mode status
+
+  # ─── Monitoring Skills ─────────────────────────────────────
+
+  - name: "check_positions"
+    description: "Check exit conditions for all open positions"
+    tool: "exec"
+    command: |
+      python3 ~/trading-bot/openclaw/scripts/position_monitor.py --mode check
+
+  - name: "force_close_all"
+    description: "Force close all open positions"
+    tool: "exec"
+    command: |
+      python3 ~/trading-bot/openclaw/scripts/position_monitor.py \
+        --mode force_close \
+        --reason "{reason}"
+    parameters:
+      - name: "reason"
+        type: "string"
+        required: false
+        default: "eod_close"
+
+  # ─── Reporting Skills ──────────────────────────────────────
+
+  - name: "daily_report"
+    description: "Generate end-of-day performance report"
+    tool: "exec"
+    command: |
+      python3 ~/trading-bot/openclaw/scripts/daily_report.py \
+        --mode daily \
+        --output ~/trading-bot/openclaw/data/report_daily.json
+    output_file: "~/trading-bot/openclaw/data/report_daily.json"
+
+  - name: "weekly_report"
+    description: "Generate weekly performance summary"
+    tool: "exec"
+    command: |
+      python3 ~/trading-bot/openclaw/scripts/daily_report.py \
+        --mode weekly \
+        --output ~/trading-bot/openclaw/data/report_weekly.json
+    output_file: "~/trading-bot/openclaw/data/report_weekly.json"
+
+  # ─── Self-Learning Skills ──────────────────────────────────
+
+  - name: "analyze_predictions"
+    description: "Analyze prediction accuracy and suggest improvements"
+    tool: "exec"
+    command: |
+      python3 ~/trading-bot/openclaw/scripts/self_learning.py \
+        --mode weekly_analysis \
+        --output ~/trading-bot/openclaw/data/self_learning_report.json
+    output_file: "~/trading-bot/openclaw/data/self_learning_report.json"
+
+  - name: "generate_skill_improvement"
+    description: "Generate code for a new/improved OpenClaw skill"
+    tool: "exec"
+    command: |
+      python3 ~/trading-bot/openclaw/scripts/self_learning.py \
+        --mode generate_skill \
+        --trade-id {trade_id} \
+        --output ~/trading-bot/openclaw/data/suggested_skill.json
+    parameters:
+      - name: "trade_id"
+        type: "integer"
+        required: true
+
+  # ─── Database Skills ───────────────────────────────────────
+
+  - name: "init_database"
+    description: "Initialize database schema (create all tables)"
+    tool: "exec"
+    command: |
+      python3 ~/trading-bot/openclaw/scripts/db_utils.py

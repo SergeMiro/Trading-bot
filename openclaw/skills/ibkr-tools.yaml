@@ -1,0 +1,94 @@
+# ═══════════════════════════════════════════════════════════════
+# OpenClaw Skills — IBKR-specific Tools
+# Lower-level IBKR operations for advanced use
+# ═══════════════════════════════════════════════════════════════
+
+skills:
+
+  - name: "ibkr_connection_test"
+    description: "Test IBKR TWS/Gateway connection"
+    tool: "exec"
+    command: |
+      python3 -c "
+      from ib_insync import IB
+      ib = IB()
+      try:
+          ib.connect('${IBKR_HOST:-127.0.0.1}', ${IBKR_PORT:-7497}, clientId=99)
+          acct = ib.accountSummary()
+          nlv = next((a.value for a in acct if a.tag == 'NetLiquidation' and a.currency == 'USD'), '0')
+          print(f'Connected. Account NLV: \${nlv}')
+          ib.disconnect()
+      except Exception as e:
+          print(f'Connection FAILED: {e}')
+      "
+
+  - name: "ibkr_account_summary"
+    description: "Get IBKR account summary (balance, buying power, P&L)"
+    tool: "exec"
+    command: |
+      python3 -c "
+      import json
+      from ib_insync import IB
+      ib = IB()
+      try:
+          ib.connect('${IBKR_HOST:-127.0.0.1}', ${IBKR_PORT:-7497}, clientId=99)
+          acct = ib.accountSummary()
+          summary = {}
+          for a in acct:
+              if a.currency == 'USD' and a.tag in ('NetLiquidation', 'TotalCashValue', 'BuyingPower', 'UnrealizedPnL', 'RealizedPnL'):
+                  summary[a.tag] = float(a.value)
+          print(json.dumps(summary, indent=2))
+          ib.disconnect()
+      except Exception as e:
+          print(json.dumps({'error': str(e)}))
+      "
+
+  - name: "ibkr_get_price"
+    description: "Get current price for a ticker from IBKR"
+    tool: "exec"
+    command: |
+      python3 -c "
+      import json
+      from ib_insync import IB, Stock
+      ib = IB()
+      try:
+          ib.connect('${IBKR_HOST:-127.0.0.1}', ${IBKR_PORT:-7497}, clientId=99)
+          contract = Stock('{ticker}', 'SMART', 'USD')
+          ib.qualifyContracts(contract)
+          md = ib.reqMktData(contract, '', False, False)
+          ib.sleep(3)
+          print(json.dumps({
+              'ticker': '{ticker}',
+              'last': md.last,
+              'bid': md.bid,
+              'ask': md.ask,
+              'close': md.close,
+              'volume': md.volume,
+          }))
+          ib.disconnect()
+      except Exception as e:
+          print(json.dumps({'error': str(e)}))
+      "
+    parameters:
+      - name: "ticker"
+        type: "string"
+        required: true
+        description: "Stock ticker symbol (e.g., AAPL)"
+
+  - name: "ibkr_cancel_all_orders"
+    description: "Cancel all pending orders in IBKR (emergency tool)"
+    tool: "exec"
+    command: |
+      python3 -c "
+      from ib_insync import IB
+      ib = IB()
+      try:
+          ib.connect('${IBKR_HOST:-127.0.0.1}', ${IBKR_PORT:-7497}, clientId=99)
+          ib.reqGlobalCancel()
+          print('All orders cancelled.')
+          ib.disconnect()
+      except Exception as e:
+          print(f'Error: {e}')
+      "
+    confirm_before_run: true
+    confirmation_message: "This will cancel ALL pending orders. Are you sure?"

@@ -1,0 +1,47 @@
+# ═══════════════════════════════════════════════════════════════
+# OpenClaw Webhooks — Real-time SEC Filing Alerts
+# ═══════════════════════════════════════════════════════════════
+
+webhooks:
+
+  # SEC EDGAR real-time filing alerts
+  # Triggered by sec_rss_monitor.py when new filings detected
+  - name: "sec_edgar_realtime"
+    endpoint: "/webhook/sec-events"
+    secret: "${OPENCLAW_WEBHOOK_SECRET}"
+    agent: "master_orchestrator"
+    message_template: |
+      SEC_ALERT: New {form_type} filing detected for {ticker}.
+      Title: {title}
+      Link: {link}
+
+      Action required:
+      - If form_type == "S-3": Mark ticker as RED FLAG, notify user immediately
+      - If form_type == "8-K": Re-run events analysis for this ticker
+      - If form_type == "4": Update insider trading score for this ticker
+    description: "Real-time SEC EDGAR filing alerts from RSS monitor"
+    enabled: true
+
+  # Manual trade execution webhook (for Canvas app)
+  - name: "canvas_trade_action"
+    endpoint: "/webhook/trade-action"
+    secret: "${OPENCLAW_WEBHOOK_SECRET}"
+    agent: "master_orchestrator"
+    message_template: |
+      CANVAS_ACTION: User confirmed {action} for {ticker}.
+      Execute immediately via:
+      python3 ~/trading-bot/openclaw/scripts/execute_trade.py --mode {action} --ticker {ticker} --reason canvas_confirm
+    description: "Trade actions from OpenClaw Canvas mobile app"
+    enabled: true
+
+  # Health check webhook (for external monitoring)
+  - name: "health_check"
+    endpoint: "/webhook/health"
+    secret: "${OPENCLAW_WEBHOOK_SECRET}"
+    agent: "master_orchestrator"
+    message_template: |
+      HEALTH_CHECK: Report system status.
+      Run: python3 ~/trading-bot/openclaw/scripts/execute_trade.py --mode status
+      Return: current positions, last pipeline run time, IBKR connection status
+    description: "External health check endpoint"
+    enabled: true

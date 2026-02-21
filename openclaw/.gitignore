@@ -1,0 +1,28 @@
+# Environment
+.env
+venv/
+__pycache__/
+*.pyc
+
+# Data (runtime generated)
+data/*.json
+data/*.csv
+!data/.gitkeep
+
+# Logs
+logs/
+*.log
+
+# Docker volumes
+postgres_data/
+grafana_data/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

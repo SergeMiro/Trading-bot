@@ -1,0 +1,77 @@
+# ═══════════════════════════════════════════════════════════════
+# OpenClaw Cron Jobs — Trading Bot v2 Complete Schedule
+# All times in UTC. Convert: NY winter = UTC-5, NY summer = UTC-4
+# Only weekdays (Mon-Fri): day-of-week = 1-5
+# ═══════════════════════════════════════════════════════════════
+
+cron_jobs:
+
+  # ─── ЕЖЕДНЕВНЫЙ ЦИКЛ (будни) ────────────────────────────────
+
+  # 05:00 AM (NY) = 10:00 UTC (winter) / 09:00 UTC (summer)
+  # Утренний pipeline: календарь → SEC-события → настройка IBKR
+  - name: "daily_calendar_update"
+    schedule: "0 10 * * 1-5"
+    agent: "master_orchestrator"
+    message: "TRIGGER: START_PIPELINE: calendar → events → ibkr_setup"
+    description: "Morning pipeline: update earnings calendar, scan SEC events, configure IBKR monitoring"
+    enabled: true
+
+  # 07:30 AM (NY) = 12:30 UTC (winter) / 11:30 UTC (summer)
+  # Сбор данных премаркета
+  - name: "premarket_data_collection"
+    schedule: "30 12 * * 1-5"
+    agent: "master_orchestrator"
+    message: "TRIGGER: START_PIPELINE: premarket_data_collection"
+    description: "Pre-market data collection: volume, ATR, sentiment, sector strength"
+    enabled: true
+    condition: "file_exists:~/trading-bot/openclaw/data/ibkr_config.json"
+
+  # 10:00 AM (NY) = 15:00 UTC (winter) / 14:00 UTC (summer)
+  # Финальный скоринг и исполнение
+  - name: "final_scoring_decision"
+    schedule: "0 15 * * 1-5"
+    agent: "master_orchestrator"
+    message: "TRIGGER: START_PIPELINE: scoring → validation → execute"
+    description: "Final scoring, validation, and trade execution"
+    enabled: true
+    condition: "file_exists:~/trading-bot/openclaw/data/premarket_data.json"
+
+  # 04:00 PM (NY) = 21:00 UTC (winter) / 20:00 UTC (summer)
+  # End-of-Day: закрытие позиций + отчёт
+  - name: "eod_report"
+    schedule: "0 21 * * 1-5"
+    agent: "master_orchestrator"
+    message: "TRIGGER: GENERATE: daily_report → close_positions → archive_logs"
+    description: "End of day: force close positions, generate daily report"
+    enabled: true
+
+  # ─── МОНИТОРИНГ ПОЗИЦИЙ (каждые 5 минут в торговые часы) ────
+
+  # 09:30 AM – 04:00 PM (NY) = 14:30 – 21:00 UTC (winter)
+  - name: "position_monitor"
+    schedule: "*/5 14-20 * * 1-5"
+    agent: "master_orchestrator"
+    message: "TRIGGER: MONITOR: check_open_positions_exit_conditions"
+    description: "Check open positions for stop-loss, take-profit, max hold exit conditions"
+    enabled: true
+
+  # ─── ЕЖЕНЕДЕЛЬНЫЙ ОТЧЁТ ────────────────────────────────────
+
+  # Пятница 05:00 PM (NY) = 22:00 UTC (winter)
+  - name: "weekly_performance_report"
+    schedule: "0 22 * * 5"
+    agent: "master_orchestrator"
+    message: "TRIGGER: GENERATE: weekly_report → update_metrics → adjust_scoring_params"
+    description: "Weekly performance report + self-learning analysis"
+    enabled: true
+
+  # ─── САМООБУЧЕНИЕ (еженедельно) ────────────────────────────
+
+  # Суббота 10:00 AM (UTC) — когда рынок закрыт
+  - name: "weekly_self_learning"
+    schedule: "0 10 * * 6"
+    agent: "master_orchestrator"
+    message: "TRIGGER: SELF_LEARNING: analyze_week → generate_improvements → notify_user"
+    description: "Weekly self-learning: analyze predictions vs results, suggest improvements"
+    enabled: true
