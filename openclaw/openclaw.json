@@ -1,0 +1,98 @@
+{
+  "$schema": "https://openclaw.ai/schema/openclaw.json",
+  "_comment": "OpenClaw Gateway configuration for Trading Bot v2",
+
+  "channels": {
+    "telegram": {
+      "token": "${TELEGRAM_BOT_TOKEN}",
+      "allowFrom": ["${TELEGRAM_USER_ID}"],
+      "groups": {}
+    }
+  },
+
+  "agent": {
+    "provider": "anthropic",
+    "model": "${ANTHROPIC_MODEL}",
+    "apiKey": "${ANTHROPIC_API_KEY}",
+    "systemPrompt": "agents/master_orchestrator.md",
+    "maxTokens": 4096,
+    "temperature": 0.1
+  },
+
+  "subAgents": {
+    "calendar_agent": {
+      "systemPrompt": "agents/agent1_calendar.md",
+      "tools": ["exec"],
+      "maxTokens": 2048,
+      "temperature": 0.0
+    },
+    "events_agent": {
+      "systemPrompt": "agents/agent2_events.md",
+      "tools": ["exec"],
+      "maxTokens": 2048,
+      "temperature": 0.0
+    },
+    "ibkr_setup_agent": {
+      "systemPrompt": "agents/agent3_ibkr_setup.md",
+      "tools": ["exec", "file_read"],
+      "maxTokens": 2048,
+      "temperature": 0.0
+    },
+    "premarket_agent": {
+      "systemPrompt": "agents/agent4_premarket.md",
+      "tools": ["exec", "file_read"],
+      "maxTokens": 2048,
+      "temperature": 0.0
+    },
+    "scoring_agent": {
+      "systemPrompt": "agents/agent5_scoring.md",
+      "tools": ["exec", "file_read"],
+      "maxTokens": 4096,
+      "temperature": 0.0
+    },
+    "validation_agent": {
+      "systemPrompt": "agents/agent6_validation.md",
+      "tools": ["exec", "file_read"],
+      "maxTokens": 4096,
+      "temperature": 0.1
+    }
+  },
+
+  "skills": {
+    "directories": [
+      "skills/"
+    ]
+  },
+
+  "crons": {
+    "configFile": "crons/trading-bot-schedule.yaml"
+  },
+
+  "webhooks": {
+    "configFile": "webhooks/sec-webhook.yaml",
+    "port": 3000
+  },
+
+  "messages": {
+    "groupChat": {
+      "mentionPatterns": ["@trading-bot", "@bot"]
+    }
+  },
+
+  "exec": {
+    "workingDirectory": "~/trading-bot/openclaw",
+    "shell": "/bin/bash",
+    "timeout": 300000,
+    "env": {
+      "PYTHONPATH": "~/trading-bot/openclaw/scripts",
+      "TRADING_BOT_DIR": "~/trading-bot/openclaw"
+    }
+  },
+
+  "logging": {
+    "level": "info",
+    "file": "logs/openclaw.log",
+    "maxSize": "50MB",
+    "maxFiles": 10
+  }
+}
